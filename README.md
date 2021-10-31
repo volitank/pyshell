@@ -3,7 +3,11 @@
  >pyshell should be cross platform but has only been tested with linux
  
  # Installation
- `$ pip install pyshell`
+ `$ pip install https://github.com/volitank/pyshell/releases/download/v1.0.0.a1/pyshell-1.0.0a1-py3-none-any.whl`
+ 
+ or
+ 
+ `$ pip install https://github.com/volitank/pyshell/releases/download/v1.0.0.a1/pyshell-1.0.0a1.tar.gz`
  
  # Usage
  

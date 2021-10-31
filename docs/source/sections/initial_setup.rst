@@ -7,7 +7,13 @@ To use pyshell, first install it using pip:
 
 .. code-block:: console
 
-   $ pip install pyshell
+	$ pip install https://github.com/volitank/pyshell/releases/download/v1.0.0.a1/pyshell-1.0.0a1-py3-none-any.whl
+ 
+or
+
+.. code-block:: console
+ 
+	$ pip install https://github.com/volitank/pyshell/releases/download/v1.0.0.a1/pyshell-1.0.0a1.tar.gz
 
 .. _initialization:
 
