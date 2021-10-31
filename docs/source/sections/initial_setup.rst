@@ -15,6 +15,12 @@ or
  
 	$ pip install https://github.com/volitank/pyshell/releases/download/v1.0.0.a1/pyshell-1.0.0a1.tar.gz
 
+To install the directly from the source code you can use 
+
+.. code-block:: console
+ 
+	$ pip install https://github.com/volitank/pyshell/archive/refs/heads/main.tar.gz
+
 .. _initialization:
 
 Initialization
