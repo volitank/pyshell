@@ -75,6 +75,20 @@ For commands with dashes we use underscores instead. All underscores in the call
 	shell.echo_test()
 	# pyshell.pyshell.CommandNotFound: command echo-test does not exist
 
+Switches
+--------
+
+Because of the way dashes are coded you can do switches like below.
+
+.. code-block:: python
+
+	shell = pyshell()
+	shell.ls._lah()
+	# This is the same as 
+	shell.ls("-lah")
+	# and 
+	shell("ls", "-lah")
+
 Equivalents
 -----------
 

@@ -5,17 +5,13 @@ Installation
 
 To use pyshell, first install it using pip:
 
-.. code-block:: console
-
-	$ pip install https://github.com/volitank/pyshell/releases/download/v1.0.0.a1/pyshell-1.0.0a1-py3-none-any.whl
- 
-or
+You can install a specific release by running
 
 .. code-block:: console
  
-	$ pip install https://github.com/volitank/pyshell/releases/download/v1.0.0.a1/pyshell-1.0.0a1.tar.gz
+	$ pip install https://github.com/volitank/pyshell/releases/download/v1.0.0a2/pyshell-1.0.0a2.tar.gz
 
-To install the directly from the source code you can use 
+While we're still in early development stages it is preferred that you run directly from the git
 
 .. code-block:: console
  

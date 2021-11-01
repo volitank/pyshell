@@ -470,17 +470,24 @@ class pyshell(object):
 		name, args = self.__parse_attr_commands(self.list, *args)
 
 		self.list.clear()
+
+		# This block says to error if we're not using the shell and we can't find the command.
+		# But if we're using the shell then send it anyway. I'm not sure why I did this.
+		# Maybe we should just send it no matter what?
 		if kwargs.get('shell') is None and self.kwargs.get('shell') is None:
 			if shutil.which(name) is not None:
 				self._run_wrapper(	name, *args,
 									input=input, capture_output=capture_output, check=check,
 									logfile=logfile, timeout=timeout, **kwargs)
+				return self.process
 			else:
 				raise CommandNotFound(f'command {name} does not exist')
 		else:
 			self._run_wrapper(	name, *args,
 								input=input, capture_output=capture_output, check=check,
 								logfile=logfile, timeout=timeout, **kwargs)
+			return self.process
+
 	def __getattr__(self, attr: str):
 
 		# We need to do some check against what was called. So we get our call. 
