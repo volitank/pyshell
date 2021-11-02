@@ -20,9 +20,9 @@ import shutil
 import os
 import builtins
 import sys
+from pathlib import Path
 from inspect import getouterframes, currentframe
 from subprocess import Popen, CalledProcessError, TimeoutExpired, SubprocessError, CompletedProcess, _USE_POSIX_SPAWN
-from pathlib import Path
 
 try:
     import msvcrt
@@ -216,14 +216,10 @@ class pyshellPopen(Popen):
 			raise child_exception_type(err_msg)
 
 class pyshell(object):
-	# Originally I was using functions for each command before I started the caller parser.
-	# Leaving thise import in for now just as reference. If we decide later we don't want them then they will be removed
-	# Further more the modules for those are not going to be public, but I haven't destroyed them yet
-	#from .utils.coreutils import echo, ls, grep, cat
+
 	def __init__(	self,
 					input=None, capture_output=False, check=False,
 					logfile=None, timeout=None, alias: dict=None, **kwargs):
-		#from .utils.util_linux import mkfs
 		"""Subprocess as an object, for Linux.
 
 		Initialize with certain options and use them through the life of your object.
@@ -272,11 +268,63 @@ class pyshell(object):
 				raise TypeError(f"expected dict but got {type(alias).__name__} instead")
 		self.alias = alias
 
-	# You can call run directly and override any thing that you've initialized with
+	def __getattr__(self, attr: str):
+		# We need to do some check against what was called. So we get our call. 
+		call = getouterframes(currentframe())[1].code_context[0]
+		try:
+			# Now we're going to try to index it at a (). If this fails due to ValueError
+			# Then it means the command wasn't called. Ex: pyshell.mkfs.ext4 instead of pyshell.mkfs.ext4().
+			# We HAVE to catch and clear the list if this happens Or else commands could build in the store and
+			# You might call something later you don't really want to.
+			call = call[:call.index('(')].split('.')
+			self.list.append(attr)
+			return self
+		except ValueError:
+			self.list.clear()
+		return self
+
+	def __call__(self, *args,
+				input=None, capture_output=False, check=False,
+				logfile=None, timeout=None, alias: dict=None, **kwargs):
+		# Once called we send our list and Arguments to the call parser
+		# Which will return our command (name), and then our args
+		name, args = self.__parse_caller_commands(self.list, *args)
+		# DEV echo
+		#commands = ['echo', name]
+		commands = [name]
+		# Check kwargs to see if an alias was set
+		# If it was set our commands to that
+		if self.alias is not None:
+			if self.alias.get(name):
+				commands = self.alias.get(name)
+		
+		# Now that possible aliases are set, we can append our arguments
+		for arg in args:
+			commands.append(arg)
+
+		self.list.clear()
+		# This block says to error if we're not using the shell and we can't find the command.
+		# But if we're using the shell then send it anyway. I'm not sure why I did this.
+		# Maybe we should just send it no matter what?
+		if kwargs.get('shell') is None and self.kwargs.get('shell') is None:
+			if shutil.which(name) is not None:
+				self.run(	commands,
+							input=input, capture_output=capture_output, check=check,
+							logfile=logfile, timeout=timeout, **kwargs)
+
+				return self.process
+			else:
+				raise CommandNotFound(f'command {name} does not exist')
+		else:
+			self.run(	commands,
+						input=input, capture_output=capture_output, check=check,
+						logfile=logfile, timeout=timeout, **kwargs)
+
+			return self.process
+
 	def run(self, *popenargs,
 			input=None, capture_output=False, check=False,
 			logfile=None, timeout=None, **kwargs):
-		
 		"""Run command with arguments and return a CompletedProcess instance.
 
 		The returned instance will have attributes args, returncode, stdout and
@@ -298,7 +346,7 @@ class pyshell(object):
 
 		pyshell run has a couple of customizations over the original run.
 
-		1. pyshell.run will check if you pass a string or bytes for input=
+		1. pyshell will check if you pass a string or bytes for input=
 		you do not need to specify text=True or false 
 		(unless you are not sending input and want the output in text/bytes specifically)
 
@@ -312,7 +360,7 @@ class pyshell(object):
 
 		The other arguments are the same as for the Popen constructor.
 		"""
-
+		# We could move these into the call method but for now they will stay
 		if input is None:
 			input = self.input
 		if input is DEFAULT:
@@ -402,7 +450,6 @@ class pyshell(object):
 			# 
 			# dash.echo('$0') ## dash.run(["echo", "$0"]) ## dash.run("echo", "$0") ## dash.run("echo $0")
 			# Final output ['echo $0']
-			
 			rcommand = []
 			if len(popenargs) == 1:
 				popenargs = popenargs[0]
@@ -463,73 +510,11 @@ class pyshell(object):
 			raise TypeError(f"expected list but got {type(alias).__name__} instead")
 		self.alias.update({command:alias})
 
-	def __call__(self, *args,
-				input=None, capture_output=False, check=False,
-				logfile=None, timeout=None, alias: dict=None, **kwargs):
-
-		name, args = self.__parse_attr_commands(self.list, *args)
-
-		self.list.clear()
-
-		# This block says to error if we're not using the shell and we can't find the command.
-		# But if we're using the shell then send it anyway. I'm not sure why I did this.
-		# Maybe we should just send it no matter what?
-		if kwargs.get('shell') is None and self.kwargs.get('shell') is None:
-			if shutil.which(name) is not None:
-				self._run_wrapper(	name, *args,
-									input=input, capture_output=capture_output, check=check,
-									logfile=logfile, timeout=timeout, **kwargs)
-				return self.process
-			else:
-				raise CommandNotFound(f'command {name} does not exist')
-		else:
-			self._run_wrapper(	name, *args,
-								input=input, capture_output=capture_output, check=check,
-								logfile=logfile, timeout=timeout, **kwargs)
-			return self.process
-
-	def __getattr__(self, attr: str):
-
-		# We need to do some check against what was called. So we get our call. 
-		call = getouterframes(currentframe())[1].code_context[0]
-		try:
-			# Now we're going to try to index it at a (). If this fails due to ValueError
-			# Then it means the command wasn't called. Ex: pyshell.mkfs.ext4 instead of pyshell.mkfs.ext4().
-			# We HAVE to catch and clear the list if this happens Or else commands could build in the store and
-			# You might call something later you don't really want to.
-			call = call[:call.index('(')].split('.')
-			self.list.append(attr)
-			return self
-		except ValueError:
-			self.list.clear()
-		return self
-
-	def _run_wrapper(self, name, *args,
-					input=None, capture_output=False, check=False,
-					logfile=None, timeout=None, **kwargs):
-		# DEV-REMOVE echo
-		#commands = ['echo', name]
-		commands = [name]
-		# Check kwargs to see if an alias was set
-		# If it was set our commands to that
-		if self.alias is not None:
-			if self.alias.get(name):
-				commands = self.alias.get(name)
-		
-		# Now that possible aliases are set, we can append our arguments
-		for arg in args:
-			commands.append(arg)
-
-		self.run(commands,
-			input=input, capture_output=capture_output, check=check,
-			logfile=logfile, timeout=timeout, **kwargs)
-
-		return self.process
-
 	@staticmethod
 	def Parse_Path_Programs():
 		# Might end up removing some of these in the future as they aren't used
 		# But for now they aren't causing any harm
+		#
 		# Get Users Path
 		env = os.environ.get('PATH').split(':')
 		# Make a set to store Items since it's unique
@@ -590,8 +575,7 @@ class pyshell(object):
 
 		return programs_tuple, dot_file_tuple, dash_file_tuple, underscore_file_tuple, hybrid_file_tuple
 
-	def __parse_attr_commands(self, command_list: list, *args):
-		
+	def __parse_caller_commands(self, command_list: list, *args):
 		# If our list is only one then we can just drop and use that as a command
 		if len(command_list) >1:
 

@@ -4,11 +4,11 @@ A Linux subprocess module, An easier way to interact with the Linux shell
 
 # Installation
 
-You can install a specific release by running
+You can install the latest release
 
-`$ pip install https://github.com/volitank/pyshell/releases/download/v1.0.0a2/pyshell-1.0.0a2.tar.gz`
+`$ pip install pyshell`
 
-While we're still in early development stages it is preferred that you run directly from the git
+You can install directly from GitHub
 
 `$ pip install https://github.com/volitank/pyshell/archive/refs/heads/main.tar.gz`
 

@@ -17,7 +17,7 @@ We actually use a slightly modified version of subprocess.run
 input
 -----
 
-With pyshell input can be either a string or bytes, and there is no need to specify ``text=true`` as with subprocess
+With pyshell input can be either a string or bytes, and there is no need to specify ``text=True`` as with subprocess
 
 .. code-block:: python
 
@@ -31,7 +31,7 @@ This option works exactly like the one in subprocess. It essentially sets stdout
 check
 -----
 
-Another option we have that works just like subprocess. If set to true it will throw an exception on a bad exit code
+Another option we have that works just like subprocess. If set to True it will throw an exception on a bad exit code
 
 .. code-block:: python
 

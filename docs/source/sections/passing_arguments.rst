@@ -3,8 +3,7 @@
 Passing Arguments
 =================
 
-When passing multiple arguments to a command, each argument *must* be a separate
-string:
+When passing multiple arguments to a command, each argument *must* be a separate string:
 
 .. code-block:: python
 
