@@ -307,7 +307,7 @@ class pyshell(object):
 		# But if we're using the shell then send it anyway. I'm not sure why I did this.
 		# Maybe we should just send it no matter what?
 		if kwargs.get('shell') is None and self.kwargs.get('shell') is None:
-			if shutil.which(name) is not None:
+			if shutil.which(name) is not None or self.alias.get(name) is not None:
 				self.run(	commands,
 							input=input, capture_output=capture_output, check=check,
 							logfile=logfile, timeout=timeout, **kwargs)
