@@ -21,6 +21,7 @@ import os
 import builtins
 import sys
 from pathlib import Path
+from copy import deepcopy
 from inspect import getouterframes, currentframe
 from subprocess import Popen, CalledProcessError, TimeoutExpired, SubprocessError, CompletedProcess, _USE_POSIX_SPAWN
 
@@ -294,10 +295,11 @@ class pyshell(object):
 		commands = [name]
 		# Check kwargs to see if an alias was set
 		# If it was set our commands to that
+		
 		if self.alias is not None:
 			if self.alias.get(name):
-				commands = self.alias.get(name)
-		
+				commands = deepcopy(self.alias.get(name))
+
 		# Now that possible aliases are set, we can append our arguments
 		for arg in args:
 			commands.append(arg)
@@ -306,6 +308,7 @@ class pyshell(object):
 		# This block says to error if we're not using the shell and we can't find the command.
 		# But if we're using the shell then send it anyway. I'm not sure why I did this.
 		# Maybe we should just send it no matter what?
+		
 		if kwargs.get('shell') is None and self.kwargs.get('shell') is None:
 			if shutil.which(name) is not None or self.alias.get(name) is not None:
 				self.run(	commands,
@@ -321,7 +324,7 @@ class pyshell(object):
 						logfile=logfile, timeout=timeout, **kwargs)
 
 			return self.process
-
+		
 	def run(self, *popenargs,
 			input=None, capture_output=False, check=False,
 			logfile=None, timeout=None, **kwargs):

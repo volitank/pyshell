@@ -1,5 +1,5 @@
 # Always prefer setuptools over distutils
-from setuptools import setup, find_packages
+from setuptools import setup
 from pathlib import Path
 import pyshell
 # Define the directory that setup.py is in
