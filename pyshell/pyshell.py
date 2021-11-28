@@ -16,14 +16,17 @@
 # You should have received a copy of the GNU General Public License
 # along with pyshell.  If not, see <https://www.gnu.org/licenses/>.
 
-import shutil
 import os
-import builtins
 import sys
+import builtins
+import shutil
 from pathlib import Path
 from copy import deepcopy
 from inspect import getouterframes, currentframe
-from subprocess import Popen, CalledProcessError, TimeoutExpired, SubprocessError, CompletedProcess, _USE_POSIX_SPAWN
+from subprocess import (
+	Popen, CalledProcessError, TimeoutExpired, 
+	SubprocessError, CompletedProcess, _USE_POSIX_SPAWN)
+from pexpect import spawn
 
 try:
     import msvcrt
@@ -34,11 +37,6 @@ except ModuleNotFoundError:
     import _posixsubprocess
     import select
     import selectors
-
-PIPE = -1
-STDOUT = -2
-DEVNULL = -3
-DEFAULT = -4
 
 class pyshellPopen(Popen):
 	# we are overriding execute child so we can pass a list into the shell for extglob.
@@ -220,7 +218,8 @@ class pyshell(object):
 
 	def __init__(	self,
 					input=None, capture_output=False, check=False,
-					logfile=None, timeout=None, alias: dict=None, **kwargs):
+					logfile=None, timeout=None, alias: dict={},
+					expect=False, popen=False, **kwargs):
 		"""Subprocess as an object, for Linux.
 
 		Initialize with certain options and use them through the life of your object.
@@ -245,14 +244,16 @@ class pyshell(object):
 		dash.run(["lsblk"], shell=False)
 		"""
 		# These are not passed directly to Popen
-		self.input = input
-		self.capture_output = capture_output
-		self.check = check
-		self.logfile = logfile
-		self.timeout = timeout
+		self._input = input
+		self._capture_output = capture_output
+		self._check = check
+		self._logfile = logfile
+		self._timeout = timeout
+		self._popen = popen
+		self._expect = expect
 		# Arguments that will be passed to Popen
 		self.kwargs = kwargs
-		self.list = []
+		self._list = []
 
 		# Define all the available shell commands
 		# Might end up removing some of these in the future as they aren't used
@@ -263,11 +264,16 @@ class pyshell(object):
 		self.underscore_file_tuple, 
 		self.hybrid_file_tuple) = self.Parse_Path_Programs()
 
+		self.PIPE = -1
+		self.STDOUT = -2
+		self.DEVNULL = -3
+		self.DEFAULT = -4
+
 		# If alias was defined and is not a dict throw an error
 		if alias is not None:
 			if not isinstance(alias, dict):
 				raise TypeError(f"expected dict but got {type(alias).__name__} instead")
-		self.alias = alias
+		self._alias = alias
 
 	def __getattr__(self, attr: str):
 		# We need to do some check against what was called. So we get our call. 
@@ -278,44 +284,169 @@ class pyshell(object):
 			# We HAVE to catch and clear the list if this happens Or else commands could build in the store and
 			# You might call something later you don't really want to.
 			call = call[:call.index('(')].split('.')
-			self.list.append(attr)
+			self._list.append(attr)
 			return self
 		except ValueError:
-			self.list.clear()
+			self._list.clear()
 		return self
 
 	def __call__(self, *args,
 				input=None, capture_output=False, check=False,
-				logfile=None, timeout=None, alias: dict=None, **kwargs):
+				logfile=None, timeout=None, expect=False, popen=False, **kwargs):
+		# If someone sent us a list we should handle it
+		if len(args) == 1:
+			if isinstance(*args, list):
+				args = tuple(*args)
 		# Once called we send our list and Arguments to the call parser
 		# Which will return our command (name), and then our args
-		name, args = self.__parse_caller_commands(self.list, *args)
+		name, args = self.__parse_caller_commands(self._list, *args)
 		# DEV echo
 		#commands = ['echo', name]
 		commands = [name]
 		# Check kwargs to see if an alias was set
 		# If it was set our commands to that
 		
-		if self.alias is not None:
-			if self.alias.get(name):
-				commands = deepcopy(self.alias.get(name))
+		if self._alias is not None:
+			if self._alias.get(name):
+				commands = deepcopy(self._alias.get(name))
 
 		# Now that possible aliases are set, we can append our arguments
 		for arg in args:
 			commands.append(arg)
 
-		self.list.clear()
+		self._list.clear()
 		# This block says to error if we're not using the shell and we can't find the command.
 		# But if we're using the shell then send it anyway. I'm not sure why I did this.
 		# Maybe we should just send it no matter what?
-		
-		if kwargs.get('shell') is None and self.kwargs.get('shell') is None:
-			if shutil.which(name) is not None or self.alias.get(name) is not None:
-				self.run(	commands,
-							input=input, capture_output=capture_output, check=check,
-							logfile=logfile, timeout=timeout, **kwargs)
 
-				return self.process
+		if kwargs.get('shell') or self.kwargs.get('shell'):
+			if expect:
+				print("You can't use shell and expect")
+
+		if input is None:
+			input = self._input
+		if input is self.DEFAULT:
+			input = None
+
+		if capture_output is False:
+			capture_output = self._capture_output
+		if capture_output is self.DEFAULT:
+			capture_output = False
+
+		if check is False:
+			check = self._check
+		if check is self.DEFAULT:
+			check = False
+
+		if logfile is None:
+			logfile = self._logfile
+		if logfile is self.DEFAULT:
+			logfile = None
+
+		if timeout is None:
+			timeout = self._timeout
+		if timeout is self.DEFAULT:
+			timeout = None
+
+		if expect is False:
+			expect = self._expect
+		if expect is self.DEFAULT:
+			expect = False
+
+		if popen is False:
+			popen = self._popen
+		if popen is self.DEFAULT:
+			popen = False
+
+		if popen and expect:
+			raise ValueError('expect and popen may not be used together.')
+
+		if kwargs.get('shell') is None:
+			kwargs['shell'] = self.kwargs.get('shell')
+
+		# Update all arguments with the initialized choices.
+		for Key, Value in self.kwargs.items():
+			# Except for any choices explicitly Defaulted
+			if kwargs.get(Key) != self.DEFAULT:
+				# Make sure we Don't add our aliases. Popen can't use them
+				if 'alias' not in Key:
+					if Key != 'shell':
+						kwargs[Key] = Value
+
+		# Start real argument handling
+		if input is not None:
+			if kwargs.get('stdin') is not None:
+				raise ValueError('stdin and input arguments may not both be used.')
+			kwargs['stdin'] = self.PIPE
+
+		if capture_output:
+			if logfile is not None:
+				raise ValueError('logfile will not work with capture_output')
+			if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+				raise ValueError('stdout and stderr arguments may not be used '
+								'with capture_output.')
+			kwargs['stdout'] = self.PIPE
+			kwargs['stderr'] = self.PIPE
+
+		if input:
+			if isinstance(input, str):
+				kwargs['text'] = True
+			if isinstance(input, bytes):
+				kwargs['text'] = False
+
+		if not capture_output:
+			if logfile:
+				# Open our file. This makes it easier on the user. Just give us a filename
+				logfile = open(logfile, 'a')
+				kwargs['stdout'] = logfile
+				kwargs['stderr'] = self.STDOUT
+
+		# before we pass kwargs we need to remove anything remaining which was defaulted.	
+		for Key, Value in kwargs.copy().items():
+			if kwargs.get(Key) == self.DEFAULT:
+				del kwargs[Key]
+
+		if kwargs.get('shell') is not None:
+			if kwargs.get('shell') is True:
+				kwargs['executable'] = '/bin/bash'
+				kwargs['shell'] = True
+			elif kwargs.get('shell') is False:
+				kwargs['shell'] = None
+				kwargs['executable'] = None
+			else:
+				kwargs['executable'] = kwargs.get('shell')
+				kwargs['shell'] = True
+
+			# We need to make sure our strings are exactly how we want them for the shell
+			# All of these different ways you can do this simple command will convert it exactly.
+			# It is repr as well so if you send \n, the shell will get \n. You don't have to escape
+			# dash = pyshell(shell='/bin/dash')
+			# 
+			# dash.echo('$0') ## dash.run(["echo", "$0"]) ## dash.run("echo", "$0") ## dash.run("echo $0")
+			# Final output ['echo $0']
+			rcommand = []
+			if len(commands) == 1:
+				commands = commands[0]
+
+			if isinstance(commands, str):
+				commands = (commands,)
+			
+			for arg in commands:
+				rcommand.append(repr(arg).strip('\''))
+			commands = [' '.join((arg) for arg in rcommand)]
+
+		if kwargs.get('shell') is None and self.kwargs.get('shell') is None:
+			if shutil.which(name) is not None or self._alias.get(name) is not None:
+				if expect:
+					return spawn(" ".join(com for com in commands))
+				elif popen:
+					return pyshellPopen(commands, **kwargs)
+				else:
+					self.run(	commands,
+								input=input, capture_output=capture_output, check=check,
+								logfile=logfile, timeout=timeout, **kwargs)
+
+					return self.process
 			else:
 				raise CommandNotFound(f'command {name} does not exist')
 		else:
@@ -363,107 +494,6 @@ class pyshell(object):
 
 		The other arguments are the same as for the Popen constructor.
 		"""
-		# We could move these into the call method but for now they will stay
-		if input is None:
-			input = self.input
-		if input is DEFAULT:
-			input = None
-
-		if capture_output is False:
-			capture_output = self.capture_output
-		if capture_output is DEFAULT:
-			capture_output = False
-
-		if check is False:
-			check = self.check
-		if check is DEFAULT:
-			check = False
-
-		if logfile is None:
-			logfile = self.logfile
-		if logfile is DEFAULT:
-			logfile = None
-
-		if timeout is None:
-			timeout = self.timeout
-		if timeout is DEFAULT:
-			timeout = None
-		
-		if kwargs.get('shell') is None:
-			kwargs['shell'] = self.kwargs.get('shell')
-
-		#if kwargs.get('shell') is None:
-		# Update all arguments with the initialized choices.
-		for Key, Value in self.kwargs.items():
-			# Except for any choices explicitly Defaulted
-			if kwargs.get(Key) != DEFAULT:
-				# Make sure we Don't add our aliases. Popen can't use them
-				if 'alias' not in Key:
-					if Key != 'shell':
-						kwargs[Key] = Value
-
-		# Start real argument handling
-		if input is not None:
-			if kwargs.get('stdin') is not None:
-				raise ValueError('stdin and input arguments may not both be used.')
-			kwargs['stdin'] = PIPE
-
-		if capture_output:
-			if logfile is not None:
-				raise ValueError('logfile will not work with capture_output')
-			if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
-				raise ValueError('stdout and stderr arguments may not be used '
-								'with capture_output.')
-			kwargs['stdout'] = PIPE
-			kwargs['stderr'] = PIPE
-
-		if input:
-			if isinstance(input, str):
-				kwargs['text'] = True
-			if isinstance(input, bytes):
-				kwargs['text'] = False
-
-		if not capture_output:
-			if logfile:
-				# Open our file. This makes it easier on the user. Just give us a filename
-				logfile = open(logfile, 'a')
-				kwargs['stdout'] = logfile
-				kwargs['stderr'] = STDOUT
-
-		# before we pass kwargs we need to remove anything remaining which was defaulted.	
-		for Key, Value in kwargs.copy().items():
-			if kwargs.get(Key) == DEFAULT:
-				del kwargs[Key]
-
-		if kwargs.get('shell') is not None:
-			if kwargs.get('shell') is True:
-				kwargs['executable'] = '/bin/bash'
-				kwargs['shell'] = True
-			elif kwargs.get('shell') is False:
-				kwargs['shell'] = None
-				kwargs['executable'] = None
-			else:
-				kwargs['executable'] = kwargs.get('shell')
-				kwargs['shell'] = True
-
-			# We need to make sure our strings are exactly how we want them for the shell
-			# All of these different ways you can do this simple command will convert it exactly.
-			# It is repr as well so if you send \n, the shell will get \n. You don't have to escape
-			# dash = pyshell(shell='/bin/dash')
-			# 
-			# dash.echo('$0') ## dash.run(["echo", "$0"]) ## dash.run("echo", "$0") ## dash.run("echo $0")
-			# Final output ['echo $0']
-			rcommand = []
-			if len(popenargs) == 1:
-				popenargs = popenargs[0]
-
-			if isinstance(popenargs, str):
-				popenargs = (popenargs,)
-			
-			for arg in popenargs:
-				rcommand.append(repr(arg).strip('\''))
-				popenargs = [' '.join((arg) for arg in rcommand)]
-
 		try:
 			# Using our patched Popen for some special goodies.
 			with pyshellPopen(*popenargs, **kwargs) as process:
@@ -506,12 +536,12 @@ class pyshell(object):
 			alias: a list containing your alias ['echo', '-e']
 		"""
 		# If our alias is not a dict we assume it's none and then create a bare one.
-		if not isinstance(self.alias, dict):
-			self.alias = {}
+		if not isinstance(self._alias, dict):
+			self._alias = {}
 		# If the alias is not in a list format then we will raise an exception
 		if not isinstance(alias, list):
 			raise TypeError(f"expected list but got {type(alias).__name__} instead")
-		self.alias.update({command:alias})
+		self._alias.update({command:alias})
 
 	@staticmethod
 	def Parse_Path_Programs():

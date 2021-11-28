@@ -1,6 +1,5 @@
 # pyshell
 A Linux subprocess module, An easier way to interact with the Linux shell
->pyshell should be cross platform but has only been tested with linux
 
 # Installation
 
@@ -21,3 +20,8 @@ You can install directly from GitHub
 # Docs
 
 Check out the Official [Documentation](https://volitank.com/pyshell/index.html) for help with syntax and different arguments
+
+# TODO
+- Update docs to include new expect and popen functionality.
+- Update docs with new basic `import shell`
+- Update docs with `DEFAULT, DEVNULL, PIPE, STDOUT` moving to `shell.`

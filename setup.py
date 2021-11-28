@@ -22,7 +22,7 @@ setup(
     author_email='blake@volitank.com',  # Optional
     classifiers=[  # Optional
 	# List of classifiers https://gist.github.com/nazrulworld/3800c84e28dc464b2b30cec8bc1287fc
-        'Development Status :: 1 - Planning',
+        'Development Status :: 3 - Alpha',
 		'Environment :: Console',
 		'Intended Audience :: System Administrators',
 		'Intended Audience :: Developers',

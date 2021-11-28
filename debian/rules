@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+export PYBUILD_NAME=pyshell
+
+%:
+	dh $@ --with python3,sphinxdoc --buildsystem=pybuild
+
+override_dh_sphinxdoc:
+ifeq (,$(findstring nodoc, $(DEB_BUILD_OPTIONS)))
+	sphinx-build docs/source/ debian/python3-pyshell-doc/usr/share/doc/python3-pyshell-doc/html/
+	dh_sphinxdoc
+endif
+
+override_dh_clean:
+	rm -rf pyshell.egg-info
+	dh_clean
