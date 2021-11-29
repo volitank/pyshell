@@ -1,0 +1,5 @@
+tar-ignore = ".vscode"
+tar-ignore = "dist"
+tar-ignore = "test*"
+tar-ignore = ".git*"
+tar-ignore = "docs/build"

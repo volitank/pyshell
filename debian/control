@@ -4,7 +4,7 @@ VCS-Browser: https://salsa.debian.org/volian-team/pyshell
 Priority: important
 Section: python
 Homepage: https://salsa.debian.org/volian-team/pyshell
-Maintainer: Blake Lee <blake@volitank.com>
+Maintainer: Volian Developers <volian-devel@volian.org>
 Standards-Version: 4.6.0
 Build-Depends:	debhelper-compat (= 13),
 				dh-python,
@@ -16,8 +16,7 @@ Package: python3-pyshell
 Section: python
 Architecture: all
 Depends:	${python3:Depends},
-			python3-click,
-			python3-wcwidth,
+			python3-pexpect
 Suggests:	python3-pyshell-doc
 Description: a Linux subprocess module, an easier way to interact with the Linux shell
  pyshell is a Linux subprocess module focused on making it easier
