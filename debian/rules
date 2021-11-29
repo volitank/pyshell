@@ -13,3 +13,6 @@ endif
 override_dh_clean:
 	rm -rf pyshell.egg-info
 	dh_clean
+
+override_dh_builddeb:
+	dh_builddeb -- -Zxz

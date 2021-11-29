@@ -18,6 +18,7 @@ Architecture: all
 Depends:	${python3:Depends},
 			python3-click,
 			python3-wcwidth,
+Suggests:	python3-pyshell-doc
 Description: a Linux subprocess module, an easier way to interact with the Linux shell
  pyshell is a Linux subprocess module focused on making it easier
  to interact with the shell within python code.
@@ -29,6 +30,7 @@ Section: doc
 Architecture: all
 Depends:	${misc:Depends},
 			${sphinxdoc:Depends},
+Suggests:	python3-pyshell
 Description: a Linux subprocess module - documentation
  pyshell is a Linux subprocess module focused on making it easier
  to interact with the shell within python code.
