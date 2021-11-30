@@ -10,7 +10,8 @@ Build-Depends:	debhelper-compat (= 13),
 				dh-python,
 				python3-all-dev, 
 				python3-sphinx,
-				sphinx-rtd-theme-common,
+				python3-sphinx-rtd-theme,
+				python3-pexpect
 
 Package: python3-pyshell
 Section: python

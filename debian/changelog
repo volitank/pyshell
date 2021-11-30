@@ -1,4 +1,4 @@
-python3-pyshell (0.1.0-0volian1) unstable; urgency=medium
+python3-pyshell (0.1.0) unstable; urgency=medium
 
   * pyshell experimental release
   * This release is alpha and currently tracks pyshell python version 1.0.0a6
